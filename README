@@ -1,0 +1,19 @@
+# Database Manager Application
+
+## Overview
+
+This project is a Database Manager Application that allows users to create, update, and manage database tables through a graphical user interface (GUI). The application is built using Python and Tkinter for the GUI, and it interacts with a SQLite database.
+
+## Features
+
+- Create new database tables
+- Update existing tables
+- Add and remove columns
+- View table data
+- Simple and intuitive GUI
+
+## Requirements
+
+- Python 3.12 or higher
+- Tkinter (usually included with Python)
+- SQLite (usually included with Python)
