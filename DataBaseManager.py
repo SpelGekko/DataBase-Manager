@@ -47,17 +47,29 @@ class DataBaseManager:
         print(f"Query results from {table_name}: {results}")
         return results
     
-    def update_data(self, table_name, updates, condition):
+    def update_data(self, table_name, updates, condition, condition_values):
+        # Create the update string with placeholders
         updates_def = ", ".join([f"{col} = ?" for col in updates.keys()])
-        values = tuple(updates.values())
+        
+        # Combine updates and condition values into one tuple
+        values = tuple(updates.values()) + tuple(condition_values)  # Ensure condition_values is a tuple
+        
+        # Build the SQL query
         query = f"UPDATE {table_name} SET {updates_def} WHERE {condition}"
+        
+        # Debugging prints to ensure query correctness
+        print(f"Generated query: {query}")
+        print(f"Values: {values}")
+        
         try:
+            # Execute the query with the corresponding values
             self.cursor.execute(query, values)
             self.connection.commit()
             print(f"Data updated in {table_name}: {updates} where {condition}")
         except sqlite3.OperationalError as e:
             print(f"SQL error: {e}")
             raise
+
 
     def delete_data(self, table_name, condition, values):
         if not condition:
@@ -242,7 +254,7 @@ class DataBaseManagerGUI:
         self.search_entry.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
         Button(middle_frame, text="Search", command=self.search_data).grid(row=3, column=2, padx=10, pady=10, sticky="ew")
 
-        Button(middle_frame, text="Update Data", command=self.update_data).grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        Button(middle_frame, text="Update Data", command=DataBaseManager.update_data).grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         Button(middle_frame, text="Delete Data", command=self.delete_row).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         Button(middle_frame, text="Sort Data", command=self.open_sort_menu).grid(row=6, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
@@ -433,11 +445,15 @@ class DataBaseManagerGUI:
     def save_edit(self, row_id, col_name, col_index):
         new_value = self.edit_entry.get()
         table_name = self.table_name_entry.get()
-
-        # Debug prints
+        
+        if isinstance(col_name, tuple):
+            col_name = col_name[0]
+        
+        # Debugging prints
         print(f"Saving new value: {new_value}")
         print(f"Table name: {table_name}")
         print(f"Column name: {col_name}")
+        print(f"Column index: {col_index}")
 
         # Get the primary key column for the specified table
         primary_key_column = self.get_primary_key_column(table_name)
@@ -446,15 +462,22 @@ class DataBaseManagerGUI:
             return
 
         # Get the primary key value from the selected row
-        primary_key = self.data_treeview.item(row_id, "values")[0]  # Assuming the primary key is the first column
-        print(f"Primary key: {primary_key}")
+        primary_key_value = self.data_treeview.item(row_id, "values")[0]  # Assuming the primary key is the first column
+        print(f"Primary key: {primary_key_value}")
+
+        if not primary_key_value:
+            messagebox.showerror("Error", "No primary key value found for the selected row.")
+            return
 
         # Update the database
         try:
-            # Update data in the specified table
-            self.db_manager.update_data(table_name, {col_name: new_value}, f"{primary_key_column} = '{primary_key}'")
-            # Update the Treeview
-            self.data_treeview.set(row_id, column=col_name, value=new_value)
+            # Update the specific column with the new value
+            condition = f"{primary_key_column} = ?"  # WHERE condition
+            self.db_manager.update_data(table_name, {col_name: new_value}, condition, (primary_key_value,))
+            
+            # Update the Treeview to reflect the change
+            self.data_treeview.set(row_id, column=col_index, value=new_value)
+            
             # Close the edit window
             self.edit_window.destroy()
         except sqlite3.OperationalError as e:
@@ -770,23 +793,6 @@ class DataBaseManagerGUI:
             self.load_data()  # Reload data to reflect the new addition
         except Exception as e:
             messagebox.showerror("Error", f"Failed to insert data: {e}")
-
-    def update_data(self, table_name, updates, condition):
-        updates_def = ", ".join([f"{col} = ?" for col in updates.keys()])
-        values = tuple(updates.values())
-        query = f"UPDATE {table_name} SET {updates_def} WHERE {condition}"
-        
-        # Debug prints
-        print(f"Generated query: {query}")
-        print(f"Values: {values}")
-        
-        try:
-            self.cursor.execute(query, values)
-            self.connection.commit()
-            print(f"Data updated in {table_name}: {updates} where {condition}")
-        except sqlite3.OperationalError as e:
-            print(f"SQL error: {e}")
-            raise
 
     def open_sort_menu(self):
         selected_item = self.treeview.selection()
