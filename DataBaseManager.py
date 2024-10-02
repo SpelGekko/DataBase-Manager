@@ -243,7 +243,7 @@ class DataBaseManagerGUI:
         Button(middle_frame, text="Search", command=self.search_data).grid(row=3, column=2, padx=10, pady=10, sticky="ew")
 
         Button(middle_frame, text="Update Data", command=self.update_data).grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
-        Button(middle_frame, text="Delete Data", command=self.delete_data).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        Button(middle_frame, text="Delete Data", command=self.delete_row).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         Button(middle_frame, text="Sort Data", command=self.open_sort_menu).grid(row=6, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         # Right frame for data display
@@ -305,19 +305,58 @@ class DataBaseManagerGUI:
 
     def delete_row(self):
         selected_item = self.data_treeview.selection()
-        if selected_item:
-            item = selected_item[0]
-            row_id = self.data_treeview.item(item, "values")[0]  # Assuming the first column is the primary key
-            table_name = self.table_name_entry.get()
-            
-            # Confirm deletion
-            confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete row with ID {row_id}?")
-            if confirm:
-                self.db_manager.delete_data(table_name, f"id = {row_id}")
-                self.data_treeview.delete(item)
-                messagebox.showinfo("Success", f"Row with ID {row_id} deleted.")
-        else:
+        if not selected_item:
             messagebox.showerror("Error", "Please select a row to delete.")
+            return
+
+        # Get selected row's data
+        item = self.data_treeview.item(selected_item)
+        row_values = item['values']
+        if not row_values:
+            messagebox.showerror("Error", "Selected row has no values.")
+            return
+
+        # Get table name
+        table_name = self.table_name_entry.get()
+        if not table_name:
+            messagebox.showerror("Error", "Please select a table to delete data from.")
+            return
+
+        # Retrieve the primary key column for the selected table
+        primary_key_column = self.get_primary_key_column(table_name)
+        if not primary_key_column:
+            messagebox.showerror("Error", "No primary key found for the selected table.")
+            return
+
+        # Get primary key value for the row
+        cursor = self.db_manager.connection.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns_info = cursor.fetchall()
+
+        # Find the primary key value
+        primary_key_index = None
+        for index, column in enumerate(columns_info):
+            if column[1] == primary_key_column:
+                primary_key_index = index
+                break
+
+        if primary_key_index is None:
+            messagebox.showerror("Error", "Primary key column not found.")
+            return
+
+        primary_key_value = row_values[primary_key_index]
+        if not primary_key_value:
+            messagebox.showerror("Error", "Selected row has no primary key value.")
+            return
+
+        try:
+            condition = f"{primary_key_column} = ?"
+            print(f"Deleting from {table_name} where {condition} with row {primary_key_value}")
+            self.db_manager.delete_data(table_name, condition, (primary_key_value,))
+            messagebox.showinfo("Success", "Row deleted successfully.")
+            self.load_data()  # Reload to reflect changes
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete row: {e}")
 
     def load_table_for_editing(self, event):
         selected_item = self.treeview.selection()
@@ -424,17 +463,30 @@ class DataBaseManagerGUI:
 
     def get_primary_key_column(self, table_name):
         """Retrieve the primary key column name for the given table."""
-        query = f"PRAGMA table_info({table_name})"
+        # Properly quote the table name
+        query = f"PRAGMA table_info('{table_name}')"
         try:
             cursor = self.db_manager.connection.cursor()
+            
+            # Check if the table exists
+            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+            table_exists = cursor.fetchone()
+            if not table_exists:
+                print(f"Table {table_name} does not exist.")
+                return None
+            
             cursor.execute(query)
             columns_info = cursor.fetchall()
             
             # Debugging: print out columns_info
             print(f"Columns info for {table_name}: {columns_info}")
-            
-            # Assuming the primary key is always the first column
-            return columns_info[0][1] if columns_info else None  # Return the first column name
+
+            if columns_info:
+                print(f"Primary key column for {table_name}: {columns_info[0][1]}")
+                return columns_info[0][1]
+            else:
+                print(f"No columns found for {table_name}")
+                return None
 
         except sqlite3.OperationalError as e:
             print(f"Could not retrieve schema for table {table_name}: {e}")
@@ -624,7 +676,7 @@ class DataBaseManagerGUI:
                     messagebox.showerror("Error", f"Failed to delete column '{selected_column}': {str(e)}")
         else:
             messagebox.showerror("Error", "Please select a column to delete.")
-
+            
     def add_data_entry(self):
         row = len(self.data_entries)
         selected_item = self.treeview.selection()
@@ -632,17 +684,25 @@ class DataBaseManagerGUI:
             return
 
         table_name = self.treeview.item(selected_item, "text")
-        columns = self.db_manager.get_table_columns(table_name)
+        columns_info = self.db_manager.get_table_columns(table_name)  # Fetch column names & types
 
-        column_name_var = StringVar(self.data_frame)
-        column_name_var.set(columns[0])  # Default value
-        column_name_menu = OptionMenu(self.data_frame, column_name_var, *columns)
-        column_name_menu.grid(row=row + 1, column=0, padx=5, pady=5, sticky="ew")
+        # Loop through columns to create entries for each
+        for column_info in columns_info:
+            column_name = column_info[0]  # Get column name
+            column_type = column_info[1]  # Get column type (TEXT, INTEGER, etc.)
 
-        value_entry = Entry(self.data_frame)
-        value_entry.grid(row=row + 1, column=1, padx=5, pady=5, sticky="ew")
+            # Create label for column
+            column_label = Label(self.data_frame, text=column_name)
+            column_label.grid(row=row + 1, column=0, padx=5, pady=5, sticky="w")
 
-        self.data_entries.append((column_name_menu, value_entry))
+            # Create Entry for value input
+            value_entry = Entry(self.data_frame)
+            value_entry.grid(row=row + 1, column=1, padx=5, pady=5, sticky="ew")
+
+            # Store column and its input widget
+            self.data_entries.append((column_label, value_entry))
+
+            row += 1  # Increment row for the next column
 
     def create_table(self):
         table_name = self.table_name_entry.get().strip()
@@ -669,13 +729,28 @@ class DataBaseManagerGUI:
             return
 
         table_name = self.treeview.item(selected_item, "text")
-        columns = self.db_manager.get_table_columns(table_name)
+        columns_info = self.db_manager.get_table_columns(table_name)  # Get columns and their types
 
         data = {}
-        for entry in self.data_entries:
-            column_name = entry[0].cget("text")  # This should just be the column name
-            value = entry[1].get()
-            data[column_name.split()[0]] = value  # Split to get only the name
+        for entry, column_info in zip(self.data_entries, columns_info):
+            column_name = column_info[0]  # Column name
+            column_type = column_info[1]  # Column type (TEXT, INTEGER, etc.)
+            value = entry[1].get()  # Get the user input value from the entry field
+
+            # If value is empty, set a default based on the column type
+            if not value.strip():  # If the value is an empty string or only whitespace
+                if column_type.upper() == "TEXT":
+                    value = '...'  # Default for TEXT
+                elif column_type.upper() == "INTEGER":
+                    value = 1  # Default for INTEGER
+                elif column_type.upper() == "REAL":
+                    value = 1.0  # Default for REAL
+                elif column_type.upper() == "BLOB":
+                    value = b''  # Default for BLOB (empty byte string)
+                else:
+                    value = None  # Catch-all fallback (if unknown type)
+            
+            data[column_name] = value  # Store the value in the data dictionary
 
         # Debugging: Print the data being inserted
         print(f"Data to insert into {table_name}: {data}")  # Debugging line
@@ -712,64 +787,6 @@ class DataBaseManagerGUI:
         except sqlite3.OperationalError as e:
             print(f"SQL error: {e}")
             raise
-
-    def delete_data(self):
-        # Select the row from the data treeview (where the actual data is displayed)
-        selected_item = self.data_treeview.selection()
-
-        if not selected_item:
-            messagebox.showerror("Error", "Please select a row to delete.")
-            return
-
-        # Get the selected row's values from the data treeview
-        item_values = self.data_treeview.item(selected_item, "values")
-        if not item_values:
-            messagebox.showerror("Error", "No values found for the selected row.")
-            return
-
-        # Debugging: Print the selected row values
-        print(f"Selected row values: {item_values}")
-
-        # Check the correct index for the ID column (assuming it's not in the first column)
-        unique_id_index = 0  # Set this to the correct column index for ID
-        unique_id = item_values[unique_id_index]
-
-        # If unique_id is None, display an error
-        if not unique_id:
-            messagebox.showerror("Error", "Could not find a valid ID for deletion.")
-            return
-
-        # Debugging: Print the unique ID
-        print(f"Unique ID for deletion: {unique_id}")
-
-        # Now get the table name from the table treeview (left side)
-        selected_table_item = self.treeview.selection()
-
-        if not selected_table_item:
-            messagebox.showerror("Error", "Please select a table from the left panel.")
-            return
-
-        table_name = self.treeview.item(selected_table_item, "text")
-
-        # Debugging: Print the table name
-        print(f"Deleting from table: {table_name}")
-
-        # Prepare the condition for deletion
-        condition = "ID = ?"
-
-        try:
-            # Debugging: Print the query and values being executed
-            print(f"Attempting to delete from {table_name} where {condition} with ID {unique_id}")
-
-            # Call the delete_data method from db_manager with the table name, condition, and ID value
-            self.db_manager.delete_data(table_name, condition, (unique_id,))
-            messagebox.showinfo("Success", f"Row with ID {unique_id} deleted successfully.")
-            
-            # Reload data to reflect the deletion
-            self.load_data()
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to delete data: {str(e)}")
-            print(f"Error occurred: {e}")
 
     def open_sort_menu(self):
         selected_item = self.treeview.selection()
