@@ -159,12 +159,20 @@ class DataBaseManager:
 
     def fetch_data(self, table_name, order_by=None, search_term=None):
         query = f"SELECT * FROM {table_name}"
-        if search_term:
-            query += f" WHERE {search_term}"
+        values = []  # To store search term values
+        
+        if search_term and isinstance(search_term, tuple):
+            search_condition, search_values = search_term
+            query += f" WHERE {search_condition}"
+            values = search_values  # Use the provided values for the WHERE condition
+
         if order_by:
             query += f" ORDER BY {order_by}"
+
         print(f"Executing query: {query}")  # Debugging line to print the query
-        self.cursor.execute(query)
+        print(f"With values: {values}")  # Debugging line to print the values used for the query
+
+        self.cursor.execute(query, values)
         return self.cursor.fetchall()
 
 class DataBaseManagerGUI:
@@ -397,25 +405,37 @@ class DataBaseManagerGUI:
     def load_data(self, order_by=None, search_term=None):
         selected_item = self.treeview.selection()
         if selected_item:
+            # Get the table name from the selected item in the treeview
             table_name = self.treeview.item(selected_item, "text")
             self.table_name_entry.delete(0, END)
             self.table_name_entry.insert(0, table_name)
             
+            # Get columns for the selected table
             columns = self.db_manager.get_table_columns(table_name)
             self.data_treeview["columns"] = columns
             for col in columns:
                 self.data_treeview.heading(col, text=col)
                 self.data_treeview.column(col, width=100)
             
+            # Clear any existing rows in the data_treeview
             for item in self.data_treeview.get_children():
                 self.data_treeview.delete(item)
             
-            data = self.db_manager.fetch_data(table_name, order_by=order_by, search_term=search_term)
+            # Check if search_term is passed as a tuple (condition, values)
+            if search_term and isinstance(search_term, tuple):
+                search_condition, search_values = search_term
+                data = self.db_manager.fetch_data(table_name, order_by=order_by, search_term=(search_condition, search_values))
+            else:
+                # Otherwise, just pass the search_term as it is
+                data = self.db_manager.fetch_data(table_name, order_by=order_by, search_term=search_term)
+            
+            # Insert data rows into the data_treeview
             for row in data:
                 self.data_treeview.insert("", "end", values=row)
         else:
+            # Show error if no table is selected
             messagebox.showerror("Error", "Please select a table to load data.")
-    
+        
     def on_double_click(self, event):
         # Identify the row and column
         row_id = self.data_treeview.identify_row(event.y)
@@ -801,7 +821,8 @@ class DataBaseManagerGUI:
             return
 
         table_name = self.treeview.item(selected_item, "text")
-        columns = self.db_manager.get_table_columns(table_name)
+        columns_info = self.db_manager.get_table_columns(table_name)
+        columns = [col[0] for col in columns_info]  # Extract only the column names
 
         sort_window = Toplevel(self.root)
         sort_window.title("Sort Data")
@@ -823,33 +844,51 @@ class DataBaseManagerGUI:
         order_var.set("Ascending")  # Default value
         OptionMenu(sort_window, order_var, "Ascending", "Descending").grid(row=1, column=1, padx=10, pady=10)
 
-        Button(sort_window, text="Sort", command=lambda: self.sort_data(table_name, column_var.get(), order_var.get())).grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+        Button(sort_window, text="Sort", command=lambda: self.sort_data(table_name, column_var.get(), order_var.get(), self.sort_type_var.get())).grid(row=2, column=0, columnspan=2, padx=10, pady=10)
     
-    def sort_data(self, table_name, column, order):
+    def sort_data(self, table_name, column, order, sort_type):
         if not table_name or not column or not order:
             messagebox.showerror("Error", "Invalid sorting parameters.")
             return
+        if isinstance(column, tuple):
+            column = column[0]
 
         # Map user-friendly sorting order to SQL keywords
+        print(f"Column: {column}, Order: {order}, Type: {sort_type})")
         order_sql = "ASC" if order == "Ascending" else "DESC"
-
-        order_by = f"{column} {order_sql}"
+        if sort_type == "Numerical":
+            order_by = f"CAST({column} AS REAL) {order_sql}"
+        else:
+            order_by = f"{column} {order_sql}"
+            
         self.load_data(order_by=order_by)
 
     def search_data(self):
         search_term = self.search_entry.get()
+        
+        # If no search term is entered, load all data without search condition
         if not search_term:
             self.load_data(order_by=None)
-
+            return  # Stop further execution
+        
+        # Get the selected table from the treeview
         selected_item = self.treeview.selection()
         if not selected_item:
             messagebox.showerror("Error", "Please select a table to search data.")
             return
 
+        # Get the table name and its columns
         table_name = self.treeview.item(selected_item, "text")
         columns = self.db_manager.get_table_columns(table_name)
-        search_condition = " OR ".join([f"{col} LIKE '%{search_term}%'" for col in columns])
-        self.load_data(search_term=search_condition)
+        columns = [col[0] for col in columns]  # Extract column names from the tuple
+
+        # Build the search condition using parameterized queries to avoid SQL injection
+        search_condition = " OR ".join([f"{col} LIKE ?" for col in columns])
+        search_values = [f"%{search_term}%"] * len(columns)  # Create a list of search terms for each column
+        
+        # Call load_data with the constructed search condition and values
+        self.load_data(search_term=(search_condition, search_values))
+
 
 if __name__ == "__main__":
     root = Tk()
