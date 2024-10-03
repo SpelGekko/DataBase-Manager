@@ -1,7 +1,9 @@
 ## Made by Gekko
 
 import sqlite3
-from tkinter import Tk, Label, Entry, Button, messagebox, simpledialog, ttk, Toplevel, END, OptionMenu, StringVar, Listbox, SINGLE, IntVar
+from tkinter import Tk, Label, messagebox, ttk, Toplevel, END, StringVar, Listbox, SINGLE, IntVar
+from Settings import Settings
+from ttkthemes import ThemedStyle
 
 class DataBaseManager:
     def __init__(self, db_name):
@@ -176,7 +178,7 @@ class DataBaseManager:
         return self.cursor.fetchall()
 
 class DataBaseManagerGUI:
-    def __init__(self, root):
+    def __init__(self, root, theme_name="alt"):
         self.db_manager = DataBaseManager("test.db")
         self.root = root
         self.root.title("Database Manager")
@@ -186,7 +188,9 @@ class DataBaseManagerGUI:
 
         self.create_widgets()
         self.populate_treeview()
-        self.create_column_selection_listbox()
+
+        # Apply the selected theme
+        self.apply_theme(theme_name)
 
         # Variable to hold the selected column for deletion
         self.selected_column_index = IntVar(value=-1)  # Default to no selection
@@ -194,12 +198,16 @@ class DataBaseManagerGUI:
     def create_widgets(self):
         # Set the window to fullscreen
         self.root.state("zoomed")
-
+        
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
+
+        # Add the Settings button
+        settings_button = ttk.Button(main_frame, text="Settings", command=self.open_settings)
+        settings_button.pack(anchor="nw", padx=10, pady=10)
 
         # PanedWindow to split the main frame into three sections horizontally
         paned_window = ttk.PanedWindow(main_frame, orient="horizontal")
@@ -209,24 +217,24 @@ class DataBaseManagerGUI:
         left_frame = ttk.Frame(paned_window)
         paned_window.add(left_frame, weight=1)
 
-        Label(left_frame, text="Table Name:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.table_name_entry = Entry(left_frame)
+        ttk.Label(left_frame, text="Table Name:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        self.table_name_entry = ttk.Entry(left_frame)
         self.table_name_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
-        Button(left_frame, text="Create Table", command=self.create_table).grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
-        Button(left_frame, text="Update Table", command=self.update_table).grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(left_frame, text="Create Table", command=self.create_table).grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(left_frame, text="Update Table", command=self.update_table).grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         self.columns_frame = ttk.Frame(left_frame)
         self.columns_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
 
         # Add headers for column entries
-        Label(self.columns_frame, text="Column Name").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        Label(self.columns_frame, text="Column Type").grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        ttk.Label(self.columns_frame, text="Column Name").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(self.columns_frame, text="Column Type").grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
         self.add_column_entry()  # Method to add a column entry row
 
-        Button(left_frame, text="Add Column", command=self.add_column_entry).grid(row=4, column=0, columnspan=1, padx=10, pady=10, sticky="ew")
-        Button(left_frame, text="Remove Column", command=self.open_remove_column_dialog).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(left_frame, text="Add Column", command=self.add_column_entry).grid(row=4, column=0, columnspan=1, padx=10, pady=10, sticky="ew")
+        ttk.Button(left_frame, text="Remove Column", command=self.open_remove_column_dialog).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         # Treeview to display tables
         self.treeview = ttk.Treeview(left_frame, columns=("Columns"), show="headings")
@@ -237,34 +245,31 @@ class DataBaseManagerGUI:
         self.treeview.grid(row=6, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
         self.treeview.bind("<Double-1>", self.load_table_for_editing)
 
-        Button(left_frame, text="Delete Table", command=self.delete_table).grid(row=7, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(left_frame, text="Delete Table", command=self.delete_table).grid(row=7, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         # Middle frame for data adding, sorting, and searching
-        middle_frame = ttk.Frame(paned_window)
-        paned_window.add(middle_frame, weight=1)
-
-        self.data_frame = ttk.Frame(middle_frame)
-        self.data_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+        self.middle_frame = ttk.Frame(paned_window)
+        paned_window.add(self.middle_frame, weight=1)
 
         # Add headers for data entries
-        Label(self.data_frame, text="Column Name").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        Label(self.data_frame, text="Value").grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        ttk.Label(self.middle_frame, text="Column Name").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(self.middle_frame, text="Value").grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
         if not self.treeview.selection():
             self.add_data_entry()
 
-        Button(middle_frame, text="Add Data", command=self.add_data_entry).grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
-        Button(middle_frame, text="Insert Data", command=self.insert_data).grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(self.middle_frame, text="Add Data", command=self.add_data_entry).grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(self.middle_frame, text="Insert Data", command=self.insert_data).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         # Add search functionality
-        Label(middle_frame, text="Search:").grid(row=3, column=0, padx=10, pady=10, sticky="w")
-        self.search_entry = Entry(middle_frame)
-        self.search_entry.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
-        Button(middle_frame, text="Search", command=self.search_data).grid(row=3, column=2, padx=10, pady=10, sticky="ew")
+        ttk.Label(self.middle_frame, text="Search:").grid(row=6, column=0, padx=10, pady=10, sticky="w")
+        self.search_entry = ttk.Entry(self.middle_frame)
+        self.search_entry.grid(row=6, column=1, padx=10, pady=10, sticky="ew")
+        ttk.Button(self.middle_frame, text="Search", command=self.search_data).grid(row=6, column=2, padx=10, pady=10, sticky="ew")
 
-        Button(middle_frame, text="Update Data", command=DataBaseManager.update_data).grid(row=4, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
-        Button(middle_frame, text="Delete Data", command=self.delete_row).grid(row=5, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
-        Button(middle_frame, text="Sort Data", command=self.open_sort_menu).grid(row=6, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(self.middle_frame, text="Update Data", command=DataBaseManager.update_data).grid(row=7, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(self.middle_frame, text="Delete Data", command=self.delete_row).grid(row=8, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        ttk.Button(self.middle_frame, text="Sort Data", command=self.open_sort_menu).grid(row=9, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         # Right frame for data display
         right_frame = ttk.Frame(paned_window)
@@ -285,12 +290,25 @@ class DataBaseManagerGUI:
         scrollbar_x.pack(side="bottom", fill="x")
         self.data_treeview.configure(xscrollcommand=scrollbar_x.set)
 
-        Button(right_frame, text="Load Data", command=self.load_data).pack(padx=10, pady=10)
+        ttk.Button(right_frame, text="Load Data", command=self.load_data).pack(padx=10, pady=10)
 
         self.data_treeview.bind("<Double-1>", self.on_double_click)
 
         # Populate the treeview with tables from the database
         self.populate_treeview()
+
+    def open_settings(self):
+        Settings(self.root, self)
+
+    def apply_theme(self, theme_name):
+        style = ThemedStyle(self.root)
+        style.set_theme(theme_name)  # Set the theme
+
+        # Get the background color from the current theme
+        bg_color = style.lookup("TFrame", "background")
+
+        # Set the background color of the main window
+        self.root.configure(bg=bg_color)
     
     def show_condition_help(self):
         messagebox.showinfo("Condition Help", "Use SQL syntax for conditions.\n\nExamples:\n- id = 1\n- name = 'John'\n- age > 30\n- salary BETWEEN 50000 AND 100000")
@@ -299,7 +317,7 @@ class DataBaseManagerGUI:
         row = len(self.column_entries)  # Determine the row index for new entries
 
         # Create a column name entry widget
-        column_name_entry = Entry(self.columns_frame)
+        column_name_entry = ttk.Entry(self.columns_frame)
         if column_name:  # Insert existing column name if provided
             column_name_entry.insert(0, column_name)
         column_name_entry.grid(row=row + 1, column=0, padx=5, pady=5, sticky="ew")
@@ -309,7 +327,7 @@ class DataBaseManagerGUI:
         column_type_var.set(column_type if column_type else "TEXT")  # Set default type to TEXT
 
         # Create the OptionMenu for column types
-        column_type_menu = OptionMenu(self.columns_frame, column_type_var, "TEXT", "INTEGER", "REAL", "BLOB")
+        column_type_menu = ttk.Combobox(self.columns_frame, textvariable=column_type_var, values=["TEXT", "INTEGER", "REAL", "BLOB"])
         column_type_menu.grid(row=row + 1, column=1, padx=5, pady=5, sticky="ew")
 
         # Append the column entry widgets to the list (name entry and type menu)
@@ -467,11 +485,11 @@ class DataBaseManagerGUI:
         self.edit_window.title("Edit Cell")
         
         Label(self.edit_window, text=f"Editing {col_name}").grid(row=0, column=0, padx=10, pady=10)
-        self.edit_entry = Entry(self.edit_window)
+        self.edit_entry = ttk.Entry(self.edit_window)
         self.edit_entry.grid(row=0, column=1, padx=10, pady=10)
         self.edit_entry.insert(0, current_value)
         
-        Button(self.edit_window, text="Save", command=lambda: self.save_edit(row_id, col_name, col_index)).grid(row=1, column=0, columnspan=2, padx=10, pady=10)
+        ttk.Button(self.edit_window, text="Save", command=lambda: self.save_edit(row_id, col_name, col_index)).grid(row=1, column=0, columnspan=2, padx=10, pady=10)
 
     def save_edit(self, row_id, col_name, col_index):
         new_value = self.edit_entry.get()
@@ -561,22 +579,7 @@ class DataBaseManagerGUI:
             print(f"Could not retrieve schema for table {table_name}: {e}")
         
         return None  # Return None if no columns found
-
-    def create_column_selection_listbox(self):
-        """Create a listbox for selecting columns."""
-        self.column_listbox = Listbox(self.data_frame, selectmode=SINGLE)
-        self.column_listbox.grid(row=5, column=2, padx=10, pady=10, sticky="nsew")
-        self.refresh_column_listbox()  # Initially populate the listbox
-
-    def refresh_column_listbox(self):
-        """Refresh the column listbox with columns from the database."""
-        table_name = self.table_name_entry.get().strip()
-        if table_name:
-            existing_columns = self.db_manager.get_table_columns(table_name)
-            self.column_listbox.delete(0,END)  # Clear existing entries
-            for column in existing_columns:
-                self.column_listbox.insert(END, column[0])  # Insert column names
-
+                
     def update_table(self):
         table_name = self.table_name_entry.get().strip()
         columns_to_add = {}
@@ -713,7 +716,7 @@ class DataBaseManagerGUI:
         self.refresh_column_radio_buttons()
 
         # Button to confirm removal
-        Button(self.remove_column_window, text="Delete Column", command=self.remove_column_entry).pack(pady=10)
+        ttk.Button(self.remove_column_window, text="Delete Column", command=self.remove_column_entry).pack(pady=10)
 
     def refresh_column_radio_buttons(self):
         # Clear existing radio buttons
@@ -761,11 +764,11 @@ class DataBaseManagerGUI:
             column_type = column_info[1]  # Get column type (TEXT, INTEGER, etc.)
 
             # Create label for column
-            column_label = Label(self.data_frame, text=column_name)
+            column_label = Label(self.middle_frame, text=column_name)
             column_label.grid(row=row + 1, column=0, padx=5, pady=5, sticky="w")
 
             # Create Entry for value input
-            value_entry = Entry(self.data_frame)
+            value_entry = ttk.Entry(self.middle_frame)
             value_entry.grid(row=row + 1, column=1, padx=5, pady=5, sticky="ew")
 
             # Store column and its input widget
@@ -853,24 +856,34 @@ class DataBaseManagerGUI:
         sort_window = Toplevel(self.root)
         sort_window.title("Sort Data")
 
-        # Sorting options
+        # Apply the current theme to the sort_window
+        current_theme = self.root.tk.call("ttk::style", "theme", "use")
+        style = ThemedStyle(sort_window)
+        style.set_theme(current_theme)  # Set the theme to match the main window's theme
 
-        Label(sort_window, text="Sort Type:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
+        # Get the background color from the current theme
+        bg_color = style.lookup("TFrame", "background")
+
+        # Set the background color of the sort_window
+        sort_window.configure(bg=bg_color)
+
+        # Sorting options
+        Label(sort_window, text="Sort Type:", bg=bg_color).grid(row=2, column=0, padx=10, pady=10, sticky="w")
         self.sort_type_var = StringVar(value="Alphabetical")
-        sort_type_menu = OptionMenu(sort_window, self.sort_type_var, "Alphabetical", "Numerical")
+        sort_type_menu = ttk.Combobox(sort_window, textvariable=self.sort_type_var, values=["Alphabetical", "Numerical"])
         sort_type_menu.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
 
-        Label(sort_window, text="Select Column to Sort By:").grid(row=0, column=0, padx=10, pady=10)
+        Label(sort_window, text="Select Column to Sort By:", bg=bg_color).grid(row=0, column=0, padx=10, pady=10)
         column_var = StringVar(sort_window)
         column_var.set(columns[0])  # Default value
-        OptionMenu(sort_window, column_var, *columns).grid(row=0, column=1, padx=10, pady=10)
+        ttk.Combobox(sort_window, textvariable=column_var, values=columns).grid(row=0, column=1, padx=10, pady=10)
 
-        Label(sort_window, text="Select Sorting Order:").grid(row=1, column=0, padx=10, pady=10)
+        Label(sort_window, text="Select Sorting Order:", bg=bg_color).grid(row=1, column=0, padx=10, pady=10)
         order_var = StringVar(sort_window)
         order_var.set("Ascending")  # Default value
-        OptionMenu(sort_window, order_var, "Ascending", "Descending").grid(row=1, column=1, padx=10, pady=10)
+        ttk.Combobox(sort_window, textvariable=order_var, values=["Ascending", "Descending"]).grid(row=1, column=1, padx=10, pady=10)
 
-        Button(sort_window, text="Sort", command=lambda: self.sort_data(table_name, column_var.get(), order_var.get(), self.sort_type_var.get())).grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+        ttk.Button(sort_window, text="Sort", command=lambda: self.sort_data(table_name, column_var.get(), order_var.get(), self.sort_type_var.get())).grid(row=3, column=0, columnspan=2, padx=10, pady=10)
     
     def sort_data(self, table_name, column, order, sort_type):
         if not table_name or not column or not order:
@@ -914,7 +927,6 @@ class DataBaseManagerGUI:
         
         # Call load_data with the constructed search condition and values
         self.load_data(search_term=(search_condition, search_values))
-
 
 if __name__ == "__main__":
     root = Tk()
