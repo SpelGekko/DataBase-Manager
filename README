@@ -20,3 +20,8 @@ This project is a Database Manager Application that allows users to create, upda
 - Python 3.12 or higher
 - Tkinter (usually included with Python)
 - SQLite (usually included with Python)
+- ttkthemes (Not included with Python)
+
+## How to Install
+
+- ttkthemes: pip install ttkthemes
