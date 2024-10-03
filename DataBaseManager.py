@@ -369,10 +369,21 @@ class DataBaseManagerGUI:
             messagebox.showerror("Error", "Selected row has no primary key value.")
             return
 
+        # Build the condition for deletion
+        conditions = [f"{primary_key_column} = ?"]
+        values = [primary_key_value]
+
+        # Add additional column conditions
+        for index, column in enumerate(columns_info):
+            if index != primary_key_index:
+                conditions.append(f"{column[1]} = ?")
+                values.append(row_values[index])
+
+        condition_str = " AND ".join(conditions)
+
         try:
-            condition = f"{primary_key_column} = ?"
-            print(f"Deleting from {table_name} where {condition} with row {primary_key_value}")
-            self.db_manager.delete_data(table_name, condition, (primary_key_value,))
+            print(f"Deleting from {table_name} where {condition_str} with values {values}")
+            self.db_manager.delete_data(table_name, condition_str, tuple(values))
             messagebox.showinfo("Success", "Row deleted successfully.")
             self.load_data()  # Reload to reflect changes
         except Exception as e:
@@ -482,18 +493,33 @@ class DataBaseManagerGUI:
             return
 
         # Get the primary key value from the selected row
-        primary_key_value = self.data_treeview.item(row_id, "values")[0]  # Assuming the primary key is the first column
+        row_values = self.data_treeview.item(row_id, "values")
+        primary_key_value = row_values[0]  # Assuming the primary key is the first column
         print(f"Primary key: {primary_key_value}")
 
         if not primary_key_value:
             messagebox.showerror("Error", "No primary key value found for the selected row.")
             return
 
-        # Update the database
+        # Build the condition for updating
+        conditions = [f"{primary_key_column} = ?"]
+        values = [primary_key_value]
+
+        # Add additional column conditions
+        cursor = self.db_manager.connection.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns_info = cursor.fetchall()
+
+        for index, column in enumerate(columns_info):
+            if index != 0:  # Skip the primary key column
+                conditions.append(f"{column[1]} = ?")
+                values.append(row_values[index])
+
+        condition_str = " AND ".join(conditions)
+
         try:
             # Update the specific column with the new value
-            condition = f"{primary_key_column} = ?"  # WHERE condition
-            self.db_manager.update_data(table_name, {col_name: new_value}, condition, (primary_key_value,))
+            self.db_manager.update_data(table_name, {col_name: new_value}, condition_str, tuple(values))
             
             # Update the Treeview to reflect the change
             self.data_treeview.set(row_id, column=col_index, value=new_value)
