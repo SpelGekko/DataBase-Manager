@@ -14,6 +14,8 @@ This project is a Database Manager Application that allows users to create, upda
 - Sort through existing Data
 - View table data
 - Simple and intuitive GUI
+- Converting tables into Excel files
+- Importing Excel files into databases as a new table
 
 ## Requirements
 
