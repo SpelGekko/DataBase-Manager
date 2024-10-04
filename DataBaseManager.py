@@ -1,9 +1,10 @@
 ## Made by Gekko
 
 import sqlite3
-from tkinter import Tk, Label, messagebox, ttk, Toplevel, END, StringVar, Listbox, SINGLE, IntVar, Menu, simpledialog
+from tkinter import Tk, Label, messagebox, ttk, Toplevel, END, StringVar, Listbox, SINGLE, IntVar, Menu, simpledialog, BOTH
 from Settings import Settings
 from ttkthemes import ThemedStyle
+import os
 
 class DataBaseManager:
     def __init__(self, db_name):
@@ -202,19 +203,6 @@ class DataBaseManagerGUI:
         
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
-    	
-        # Create a menu bar
-        self.menu_bar = Menu(self.root)
-        self.root.config(menu=self.menu_bar)
-
-        # Create a database menu
-        self.database_menu = Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="Database", menu=self.database_menu)
-
-        # Add database options to the menu
-        self.database_menu.add_command(label="test.db", command=lambda: self.switch_database("test.db"))
-        self.database_menu.add_command(label="example.db", command=lambda: self.switch_database("example.db"))
-        self.database_menu.add_command(label="sample.db", command=lambda: self.switch_database("sample.db"))
 
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
@@ -339,10 +327,6 @@ class DataBaseManagerGUI:
 
         # Set the background color of the main window
         self.root.configure(bg=bg_color)
-
-        # Apply ttk styling to the menu
-        self.menu_bar.configure(bg=bg_color)
-        self.database_menu.configure(bg=bg_color)
     
     def show_condition_help(self):
         messagebox.showinfo("Condition Help", "Use SQL syntax for conditions.\n\nExamples:\n- id = 1\n- name = 'John'\n- age > 30\n- salary BETWEEN 50000 AND 100000")
@@ -968,23 +952,50 @@ class DatabaseManagerWindow:
         self.window = Toplevel(parent)
         self.window.title("Manage Databases")
 
+        # Add a Treeview to display existing databases
+        self.db_treeview = ttk.Treeview(self.window, columns=("Database"), show="headings")
+        self.db_treeview.heading("Database", text="Database")
+        self.db_treeview.pack(padx=10, pady=10, fill=BOTH, expand=True)
+        self.load_databases()
+
         # Add a button to choose a database
-        ttk.Button(self.window, text="Choose Database", command=self.open_database_menu).pack(padx=10, pady=10)
+        ttk.Button(self.window, text="Choose Database", command=self.choose_database).pack(padx=10, pady=10)
 
         # Add a button to create a new database
         ttk.Button(self.window, text="Create New Database", command=self.create_new_database).pack(padx=10, pady=10)
 
-    def open_database_menu(self):
-        # Open the database menu
-        self.main_app.database_menu.post(self.window.winfo_pointerx(), self.window.winfo_pointery())
+    def load_databases(self):
+        # Clear the Treeview
+        for item in self.db_treeview.get_children():
+            self.db_treeview.delete(item)
+        # List all .db files in the current directory
+        databases = [f for f in os.listdir('.') if f.endswith('.db')]
+        for db in databases:
+            self.db_treeview.insert("", "end", values=(db,))
+
+    def choose_database(self):
+        selected_item = self.db_treeview.selection()
+        if selected_item:
+            selected_db = self.db_treeview.item(selected_item, "values")[0]
+            self.main_app.db_manager = DataBaseManager(selected_db)
+            self.main_app.current_db = selected_db
+            messagebox.showinfo("Database Selected", f"Switched to database: {selected_db}")
+            self.main_app.populate_treeview()
+            self.window.destroy()
 
     def create_new_database(self):
         new_db_name = simpledialog.askstring("New Database", "Enter the name of the new database:", parent=self.window)
         if new_db_name:
-            self.main_app.db_manager = DataBaseManager(new_db_name)
-            self.main_app.current_db = new_db_name
-            messagebox.showinfo("Database Created", f"Created and switched to new database: {new_db_name}")
-            self.main_app.populate_treeview()
+            if not new_db_name.endswith(".db"):
+                new_db_name += ".db"
+            if os.path.exists(new_db_name):
+                messagebox.showerror("Error", "Database already exists.")
+            else:
+                self.main_app.db_manager = DataBaseManager(new_db_name)
+                self.main_app.current_db = new_db_name
+                messagebox.showinfo("Database Created", f"Created and switched to new database: {new_db_name}")
+                self.main_app.populate_treeview()
+                self.load_databases()  # Refresh the list of databases
 
 if __name__ == "__main__":
     root = Tk()
