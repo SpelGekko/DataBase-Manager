@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 from ttkthemes import ThemedStyle
 from DataBaseManager import DataBaseManagerGUI
 from Settings import Settings
+from Converter import ConverterApp  # Import the ConverterApp
 
 class MainApp:
     def __init__(self, root):
@@ -24,8 +25,8 @@ class MainApp:
         db_manager_button = ttk.Button(self.root, text="DataBase Manager", command=lambda: self.open_part("Database Manager"))
         db_manager_button.grid(row=1, column=0, padx=10, pady=10)
 
-        part2_button = ttk.Button(self.root, text="Part 2", command=lambda: self.open_part("Part 2"))
-        part2_button.grid(row=1, column=1, padx=10, pady=10)
+        converter_button = ttk.Button(self.root, text="Converter", command=lambda: self.open_part("Converter"))
+        converter_button.grid(row=1, column=1, padx=10, pady=10)
 
         part3_button = ttk.Button(self.root, text="Part 3", command=lambda: self.open_part("Part 3"))
         part3_button.grid(row=1, column=2, padx=10, pady=10)
@@ -48,6 +49,9 @@ class MainApp:
         if part_name == "Database Manager":
             db_manager_window = tk.Toplevel(self.root)
             DataBaseManagerGUI(db_manager_window, self.current_theme)
+        elif part_name == "Converter":
+            converter_window = tk.Toplevel(self.root)
+            ConverterApp(converter_window, self.current_theme)
         else:
             messagebox.showinfo(part_name, f"Opening {part_name}")
 
