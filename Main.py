@@ -6,6 +6,7 @@ from ttkthemes import ThemedStyle
 from DataBaseManager import DataBaseManagerGUI
 from Settings import Settings
 from Converter import ConverterApp  # Import the ConverterApp
+from FileManager import FileManager  # Import the LogViewer
 
 class MainApp:
     def __init__(self, root):
@@ -28,8 +29,8 @@ class MainApp:
         converter_button = ttk.Button(self.root, text="Converter", command=lambda: self.open_part("Converter"))
         converter_button.grid(row=1, column=1, padx=10, pady=10)
 
-        part3_button = ttk.Button(self.root, text="Part 3", command=lambda: self.open_part("Part 3"))
-        part3_button.grid(row=1, column=2, padx=10, pady=10)
+        file_manager_button = ttk.Button(self.root, text="File Manager", command=lambda: self.open_part("File Manager"))
+        file_manager_button.grid(row=1, column=2, padx=10, pady=10)
 
     def apply_theme(self, theme_name):
         self.current_theme = theme_name
@@ -52,6 +53,9 @@ class MainApp:
         elif part_name == "Converter":
             converter_window = tk.Toplevel(self.root)
             ConverterApp(converter_window, self.current_theme)
+        elif part_name == "File Manager":
+            FileManager_window = tk.Toplevel(self.root)
+            FileManager(FileManager_window, self.current_theme)
         else:
             messagebox.showinfo(part_name, f"Opening {part_name}")
 
