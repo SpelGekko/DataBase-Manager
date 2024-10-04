@@ -1,7 +1,7 @@
 ## Made by Gekko
 
 import sqlite3
-from tkinter import Tk, Label, messagebox, ttk, Toplevel, END, StringVar, Listbox, SINGLE, IntVar
+from tkinter import Tk, Label, messagebox, ttk, Toplevel, END, StringVar, Listbox, SINGLE, IntVar, Menu, simpledialog
 from Settings import Settings
 from ttkthemes import ThemedStyle
 
@@ -180,6 +180,7 @@ class DataBaseManager:
 class DataBaseManagerGUI:
     def __init__(self, root, theme_name="alt"):
         self.db_manager = DataBaseManager("test.db")
+        self.current_db = "test.db"
         self.root = root
         self.root.title("Database Manager")
 
@@ -201,6 +202,19 @@ class DataBaseManagerGUI:
         
         main_frame = ttk.Frame(self.root)
         main_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+    	
+        # Create a menu bar
+        self.menu_bar = Menu(self.root)
+        self.root.config(menu=self.menu_bar)
+
+        # Create a database menu
+        self.database_menu = Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Database", menu=self.database_menu)
+
+        # Add database options to the menu
+        self.database_menu.add_command(label="test.db", command=lambda: self.switch_database("test.db"))
+        self.database_menu.add_command(label="example.db", command=lambda: self.switch_database("example.db"))
+        self.database_menu.add_command(label="sample.db", command=lambda: self.switch_database("sample.db"))
 
         self.root.grid_rowconfigure(0, weight=1)
         self.root.grid_columnconfigure(0, weight=1)
@@ -208,6 +222,9 @@ class DataBaseManagerGUI:
         # Add the Settings button
         settings_button = ttk.Button(main_frame, text="Settings", command=self.open_settings)
         settings_button.pack(anchor="nw", padx=10, pady=10)
+
+        # Add a button to open the database selector
+        ttk.Button(main_frame, text="Switch Database", command=self.open_database_manager_window).pack(anchor="nw", padx=10, pady=10)
 
         # PanedWindow to split the main frame into three sections horizontally
         paned_window = ttk.PanedWindow(main_frame, orient="horizontal")
@@ -297,8 +314,21 @@ class DataBaseManagerGUI:
         # Populate the treeview with tables from the database
         self.populate_treeview()
 
+    def open_database_manager_window(self):
+        DatabaseManagerWindow(self.root, self)
+
+    def switch_database(self, db_name):
+        self.current_db = db_name
+        self.db_manager = DataBaseManager(db_name)
+        messagebox.showinfo("Database Switched", f"Switched to database: {db_name}")
+        self.populate_treeview()
+
     def open_settings(self):
         Settings(self.root, self)
+
+    def open_database_menu(self):
+        # Open the database menu
+        self.database_menu.post(self.root.winfo_pointerx(), self.root.winfo_pointery())
 
     def apply_theme(self, theme_name):
         style = ThemedStyle(self.root)
@@ -309,6 +339,10 @@ class DataBaseManagerGUI:
 
         # Set the background color of the main window
         self.root.configure(bg=bg_color)
+
+        # Apply ttk styling to the menu
+        self.menu_bar.configure(bg=bg_color)
+        self.database_menu.configure(bg=bg_color)
     
     def show_condition_help(self):
         messagebox.showinfo("Condition Help", "Use SQL syntax for conditions.\n\nExamples:\n- id = 1\n- name = 'John'\n- age > 30\n- salary BETWEEN 50000 AND 100000")
@@ -927,6 +961,30 @@ class DataBaseManagerGUI:
         
         # Call load_data with the constructed search condition and values
         self.load_data(search_term=(search_condition, search_values))
+
+class DatabaseManagerWindow:
+    def __init__(self, parent, main_app):
+        self.main_app = main_app
+        self.window = Toplevel(parent)
+        self.window.title("Manage Databases")
+
+        # Add a button to choose a database
+        ttk.Button(self.window, text="Choose Database", command=self.open_database_menu).pack(padx=10, pady=10)
+
+        # Add a button to create a new database
+        ttk.Button(self.window, text="Create New Database", command=self.create_new_database).pack(padx=10, pady=10)
+
+    def open_database_menu(self):
+        # Open the database menu
+        self.main_app.database_menu.post(self.window.winfo_pointerx(), self.window.winfo_pointery())
+
+    def create_new_database(self):
+        new_db_name = simpledialog.askstring("New Database", "Enter the name of the new database:", parent=self.window)
+        if new_db_name:
+            self.main_app.db_manager = DataBaseManager(new_db_name)
+            self.main_app.current_db = new_db_name
+            messagebox.showinfo("Database Created", f"Created and switched to new database: {new_db_name}")
+            self.main_app.populate_treeview()
 
 if __name__ == "__main__":
     root = Tk()

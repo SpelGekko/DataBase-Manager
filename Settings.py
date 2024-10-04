@@ -17,6 +17,7 @@ class Settings:
         ttk.Label(self.window, text="Select Theme:").pack(pady=10)
         ttk.Radiobutton(self.window, text="Light", variable=self.theme_var, value="Light").pack(anchor=tk.W)
         ttk.Radiobutton(self.window, text="Dark", variable=self.theme_var, value="Dark").pack(anchor=tk.W)
+        ttk.Radiobutton(self.window, text="Modern", variable=self.theme_var, value="Modern").pack(anchor=tk.W)
 
         # Save button
         ttk.Button(self.window, text="Save", command=self.save_settings).pack(pady=20)
@@ -55,6 +56,7 @@ class Settings:
         """Map user-friendly theme names to actual theme names."""
         theme_map = {
             "Light": "alt",
-            "Dark": "equilux"
+            "Dark": "equilux",
+            "Modern": "breeze"
         }
         return theme_map.get(theme_name, "alt")
