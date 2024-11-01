@@ -23,7 +23,7 @@ This project is a Database Manager Application that allows users to create, upda
 - Tkinter (usually included with Python)
 - SQLite (usually included with Python)
 - ttkthemes (Not included with Python)
-- schedule
+- schedule (Not included with Python)
  
 ## How to Install
 
@@ -31,3 +31,7 @@ To correctly use the Application use the following pip commands:
 
 - ttkthemes: pip install ttkthemes
 - schedule: pip install schedule
+
+## One command install:
+
+pip install Tkinter,SQLite,ttkthemes,schedule
